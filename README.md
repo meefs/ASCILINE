@@ -21,7 +21,7 @@
 ## 🚀 Technical Features
 
 -   **Real-Time ASCII Streaming**: Low-latency video-to-ASCII conversion.
--   **Real-Time pixel Streaming**: Close visual quality to 360p video streaming it uses ▮ characthers.
+-   **Real-Time pixel Streaming**: Close visual quality to 360p video streaming it uses ▮ characters.
 -   **High Performance**: Uses **HTML5 Canvas** for rendering instead of heavy DOM elements, enabling 60 FPS playback.
 -   **Binary Protocol**: Frames are encoded into `Uint8Array` (binary) for efficient bandwidth usage.
 -   **Multiple Color Modes**: Supports everything from classic B&W to 16M color ultra-fidelity.
@@ -107,9 +107,10 @@ By default, you only need to specify the width (`--cols`). ASCILINE will automat
 
 - **ASCII Mode Recommended:** `--cols 200` to `--cols 240` (Best balance of text detail and 30-40 FPS performance).
 - **Pixel Mode Recommended:** `--cols 320` to `--cols 400` (Extremely fast, easily hits 60+ FPS,close to 360p video stream).
-
+```bash
 python stream_server.py video.mp4 --mode 5 --cols 240
 # Terminal will show: [AUTO] 1920x1080 → grid 240x67
+```
 ### Server-Side Volume Control
 Volume is controlled at the server level via the `--vol` flag (scale 0–5).
 When set to `0`, the audio engine (FFmpeg) **never runs**, saving CPU and bandwidth.
