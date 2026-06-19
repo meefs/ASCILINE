@@ -26,6 +26,7 @@ from websockets.exceptions import ConnectionClosed
 # Import the existing engine (ascii_video_player2.py)
 from ascii_video_player2 import VideoDecoder, AsciiMapper
 from codec import encode_frame
+import ytdl
 
 app = FastAPI()
 
@@ -73,11 +74,15 @@ def get_html_content():
 def resolve_video_path(video: str) -> str:
     """
     Resolves a video path by checking multiple locations in order:
+      0. If it's a URL (YouTube, etc.) -> download via yt-dlp and use that file
       1. As-is (absolute or relative to CWD)
       2. Inside the project root (BASE_DIR)
       3. Inside BASE_DIR/videos/ subfolder
     Returns the first path that exists, or the original string if none found.
     """
+    if ytdl.is_url(video):
+        return ytdl.download(video, cache_dir=os.path.join(BASE_DIR, "videos"))
+
     candidates = [
         video,
         os.path.join(BASE_DIR, video),
@@ -89,11 +94,19 @@ def resolve_video_path(video: str) -> str:
     return video  # Return original; error will be caught during playback
 
 def load_playlist(playlist_path: str) -> list[dict]:
-    """Loads playlist from a JSON file and resolves all video paths."""
+    """
+    Loads a playlist from a JSON file and resolves local video paths.
+
+    URL entries (YouTube, etc.) are left unresolved on purpose: resolving a
+    URL means downloading it, and eagerly downloading every link would block
+    startup until the whole playlist is on disk. Unresolved URLs are fetched
+    lazily by the playback loop the first time each one is about to play.
+    """
     with open(playlist_path, "r", encoding="utf-8") as f:
         items = json.load(f)
     for item in items:
-        item["video"] = resolve_video_path(item["video"])
+        if not ytdl.is_url(item["video"]):
+            item["video"] = resolve_video_path(item["video"])
     return items
 
 def load_folder(folder_path: str, default_mode: int, default_vol: int) -> list[dict]:
@@ -146,9 +159,23 @@ def build_queue(args) -> list[dict]:
             item["rows"] = args.rows
         return items
 
-    # Legacy: single video argument
+    # Single positional argument: a local file/path, or a URL.
+    # A URL may be a playlist/channel → expand it into one entry per video.
     default_cols = args.cols if args.cols is not None else (450 if args.pixel else 200)
-    return [{"video": resolve_video_path(args.video), "mode": args.mode, "vol": args.vol, "pixel": args.pixel, "cols": default_cols, "rows": args.rows}]
+    base = {"mode": args.mode, "vol": args.vol, "pixel": args.pixel,
+            "cols": default_cols, "rows": args.rows}
+
+    if ytdl.is_url(args.video):
+        urls = ytdl.expand_playlist(args.video)
+        if len(urls) > 1:
+            print(f"[YT] playlist expanded → {len(urls)} videos "
+                  f"(each downloaded on demand as it plays)")
+        # Keep URLs unresolved; the playback loop downloads each lazily so a
+        # long playlist doesn't block startup, and the cache makes replays
+        # (and --loop) instant.
+        return [{"video": u, **base} for u in urls]
+
+    return [{"video": resolve_video_path(args.video), **base}]
 
 
 # ── APP STATE ──────────────────────────────────────────────
@@ -386,6 +413,27 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             entry      = queue[queue_index]
             video_path = entry["video"]
+
+            # Lazy resolve: an unresolved URL entry (a single URL, an expanded
+            # playlist item, or a URL from a playlist.json) is downloaded the
+            # first time it is about to play, then the local path is cached back
+            # into the queue so /audio and any --loop replay reuse the file
+            # instead of re-downloading.
+            if ytdl.is_url(video_path):
+                print(f"[YT] fetching ({queue_index + 1}/{len(queue)}) {video_path}")
+                try:
+                    video_path = resolve_video_path(video_path)
+                    entry["video"] = video_path
+                except Exception as e:
+                    await websocket.send_text(f"Error: could not fetch '{video_path}': {e}")
+                    queue_index += 1
+                    if queue_index >= len(queue):
+                        if loop:
+                            queue_index = 0
+                        else:
+                            break
+                    continue
+
             render_mode= entry["mode"]
             pixel_mode = entry.get("pixel", False)
             cols       = entry.get("cols", 200)
