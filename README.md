@@ -1,4 +1,12 @@
-# 🌌 ASCILINE Engine
+```text
+ █████╗ ███████╗ ██████╗██╗██╗     ██╗███╗   ██╗███████╗  ██
+██╔══██╗██╔════╝██╔════╝██║██║     ██║████╗  ██║██╔════╝  █████
+███████║███████╗██║     ██║██║     ██║██╔██╗ ██║█████╗    ████████
+██╔══██║╚════██║██║     ██║██║     ██║██║╚██╗██║██╔══╝    ████████
+██║  ██║███████║╚██████╗██║███████╗██║██║ ╚████║███████╗  █████
+╚═╝  ╚═╝╚══════╝ ╚═════╝╚═╝╚══════╝╚═╝╚═╝  ╚═══╝╚══════╝  ██
+
+```
 
 **ASCILINE** is a high-performance, cross-platform real-time ASCII video rendering engine. **Our core objective is to transform the web into a highly dynamic and interactive typographic canvas.** By mapping pixels to text-based representations, we unlock new possibilities for web media delivery.
 
